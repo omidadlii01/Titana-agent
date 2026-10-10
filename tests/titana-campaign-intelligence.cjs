@@ -136,6 +136,20 @@ function check(condition,label){assert(condition,label);checks++;passed.push(lab
  check(await page.locator('.editorial-decisions li').count()===6,'Six unresolved decision groups rendered');
  check(await page.locator('[aria-label^="بخش‌های مرحلهٔ"]').count()===5,'Navigation accessible names use Persian numerals');
  await page.locator('#url').fill('invalid');check((await page.locator('#urlOutput').textContent()).includes('پس از اصلاح خطاها'),'Invalid destination shows actionable replacement text');await page.locator('#url').fill('https://www.titana.ir/product/123');
+ // Plain-language and business requirements: distinguish the working demo from future reporting.
+ check((await page.locator('#f_campaign').locator('..').textContent()).includes('کمپین ورودی'),'Acquisition campaign filter is explicitly labeled');
+ check((await page.locator('#filterSummary').textContent()).includes('مبنای تاریخ: شروع سشن به وقت UTC'),'Live report exposes its real date basis');
+ check(await page.locator('#report-scope-note').isVisible(),'Report scope warning is visible beside the dashboard');
+ await page.locator('#report-contract > summary').click();check((await page.locator('#report-contract').innerText()).includes('این نمای مستقل هنوز در این فایل پیاده نشده است'),'Order-date campaign view is disclosed as future work');await page.locator('#report-contract > summary').click();
+ check(await page.locator('#meeting-decisions li').count()===4,'Four explicit decision owners at conclusion');
+ check((await page.locator('#s16 .phase').nth(1).textContent()).includes('ثبت دستی یا CSV هزینه'),'Manual cost capture starts with first priority');
+ check((await page.locator('#s16 .phase').nth(1).textContent()).includes('نباید تحویل اول را متوقف کنند'),'Optional shortener features do not block first release');
+ check((await page.locator('#campaign-brief').textContent()).includes('اولین خرید معتبرش در کل سابقه'),'New customer definition uses historical first purchase');
+ check((await page.locator('#campaign-brief').textContent()).includes('فرم همین فایل برای تست، ورود دستی UTM دارد'),'Manual prototype form limitation is explicit');
+ check((await page.locator('#financial-definition').textContent()).includes('۷۰۰٬۰۰۰')&&(await page.locator('#financial-definition').textContent()).includes('تخفیف را دوباره کم نکنید'),'Financial example prevents discount double deduction');
+ check((await page.locator('#s9').textContent()).includes('این نمودار چنین اتصال چندبازدیدی را انجام نمی‌دهد'),'Single-session funnel is not presented as a multi-session journey');
+ check((await page.locator('#attributionModel option[value="last_non_direct"]').textContent())==='آخرین ورود از کانال','Attribution option has plain-language name');
+ check(!(await page.locator('body').textContent()).includes('سهم محاسبهٔ سهم فروش')&&!(await page.locator('body').textContent()).includes('First-party (First-party)'),'Mechanical replacement artifacts removed');
  // Revised reader overview and staged delivery plan.
  check(await page.locator('#presentationToggle, .presentation-controls').count()===0,'Presentation mode controls removed');
  check(await page.locator('footer').count()===0,'Visible sources and license footer removed');
