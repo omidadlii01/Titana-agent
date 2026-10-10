@@ -43,7 +43,7 @@ function check(condition,label){assert(condition,label);checks++;passed.push(lab
  const ids=await page.locator('[id]').evaluateAll(xs=>xs.map(x=>x.id));check(ids.length===new Set(ids).size,'Unique HTML IDs');
  const badLinks=await page.locator('a[href^="#"]').evaluateAll(as=>as.map(a=>a.getAttribute('href')).filter(h=>!document.getElementById(decodeURIComponent(h.slice(1)))));check(!badLinks.length,'Every internal anchor resolves');
  const images=await page.locator('img').evaluateAll(xs=>xs.map(x=>({embedded:x.src.startsWith('data:'),loaded:x.complete&&x.naturalWidth>0})));
- check(images.length===2&&images.every(x=>x.embedded&&x.loaded),'Both original reference images embedded and decoded');
+ check(images.length===0,'Reference image blocks removed as requested');
  const before=await page.evaluate(()=>TitanaDemo.metrics(TitanaDemo.sessions,TitanaDemo.clicks));
  assert.deepEqual(before,{sessions:630,users:137,clicks:792,orders:61,revenue:245100000,gross:277000000,refunds:4200000});checks++;passed.push('Original fixture totals unchanged');
  await page.screenshot({path:path.join(out,'opening-1440.png')});
@@ -136,8 +136,18 @@ function check(condition,label){assert(condition,label);checks++;passed.push(lab
  check(await page.locator('.editorial-decisions li').count()===6,'Six unresolved decision groups rendered');
  check(await page.locator('[aria-label^="بخش‌های مرحلهٔ"]').count()===5,'Navigation accessible names use Persian numerals');
  await page.locator('#url').fill('invalid');check((await page.locator('#urlOutput').textContent()).includes('پس از اصلاح خطاها'),'Invalid destination shows actionable replacement text');await page.locator('#url').fill('https://www.titana.ir/product/123');
- // Meeting-mode layout and keyboard escape.
- await page.locator('#s1').evaluate(e=>e.scrollIntoView({block:'start'}));await page.locator('#presentationToggle').click();check(await page.locator('body').evaluate(e=>e.classList.contains('presenting')),'Presentation mode enabled');await page.locator('#presentNext').click();await page.waitForTimeout(100);check((await page.locator('#presentStatus').textContent()).includes('۲'),'Presentation next follows narrative order');await page.locator('#presentPrev').click();await page.keyboard.press('Escape');check(!await page.locator('body').evaluate(e=>e.classList.contains('presenting')),'Escape exits meeting mode');
+ // Revised reader overview and staged delivery plan.
+ check(await page.locator('#presentationToggle, .presentation-controls').count()===0,'Presentation mode controls removed');
+ check(await page.locator('footer').count()===0,'Visible sources and license footer removed');
+ check(!(await page.locator('body').innerText()).includes('انتساب'),'Unfamiliar attribution wording removed from visible copy');
+ check(await page.locator('.contents-panel a').count()===17,'Contents links cover all 17 sections');
+ const contentsTargets=await page.locator('.contents-panel a').evaluateAll(xs=>xs.map(x=>x.getAttribute('href')));
+ assert.deepEqual(contentsTargets,expectedOrder.map(x=>'#s'+x));checks++;passed.push('Contents follows section order without missing or duplicate entries');
+ check(await page.locator('.overview-grid article').count()===4,'Complete four-part opening summary');
+ check(await page.locator('#s16 .phase').count()===7,'Preparation and six ordered build priorities');
+ check((await page.locator('#s16 .phase').nth(1).innerText()).includes('گزارش اولیه'),'Priority one includes usable initial reporting');
+ check((await page.locator('#s16 .phase').nth(2).innerText()).includes('مسیر مشتری'),'Priority two covers customer journey');
+ await page.locator('.contents-panel a[href="#s16"]').click();await page.waitForTimeout(120);check(await page.locator('[data-nav="16"]').getAttribute('aria-current')==='location','Contents navigates to corresponding section');
  await page.locator('#makeShort').click();await page.waitForFunction(()=>document.querySelector('#shortener').dataset.state==='success');await page.locator('#makeQr').click();
  const layouts=[];
  for(const width of [1440,1024,768,390,360]){
