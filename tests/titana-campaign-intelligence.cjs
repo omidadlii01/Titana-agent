@@ -1,6 +1,7 @@
 /* Offline presentation regression test. Development-only dependencies, no runtime CDN.
    Install: npm install --no-save --no-package-lock playwright@1.64.0 @sparticuz/chromium@153.0.0 jsqr@1.4.0 pngjs@7.0.0 axe-core@4.11.0
    Run: node tests/titana-campaign-intelligence.cjs
+   Optional: TITANA_HTML=path/to/download.html TITANA_QA_DIR=.cache/qa-download
    Optional: CHROMIUM_EXECUTABLE=/path/to/chromium (uses normal Playwright args).
    Screenshots, a PDF and machine-readable results are written to ignored .cache/qa-shortener/.
 */
@@ -12,7 +13,7 @@ const {pathToFileURL}=require('node:url');
 const {chromium:playwright}=require('playwright');
 const jsQR=require('jsqr');
 const {PNG}=require('pngjs');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'.cache/qa-shortener');
+const root=path.resolve(__dirname,'..'),out=path.resolve(root,process.env.TITANA_QA_DIR||'.cache/qa-shortener');
 fs.mkdirSync(out,{recursive:true});
 let checks=0;const passed=[];
 function check(condition,label){assert(condition,label);checks++;passed.push(label);}
@@ -29,7 +30,7 @@ function check(condition,label){assert(condition,label);checks++;passed.push(lab
  const page=await context.newPage();const errors=[],requests=[],consoleErrors=[];
  page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
  await context.setOffline(true);
- await page.goto(pathToFileURL(path.join(root,'titana-campaign-intelligence.html')).href);
+ await page.goto(pathToFileURL(path.resolve(root,process.env.TITANA_HTML||'titana-campaign-intelligence.html')).href);
  await page.evaluate(()=>document.fonts.ready);
  check(await page.locator('.section').count()===17,'All 17 original product sections retained');
  check(await page.locator('[data-nav-act]').count()===5,'Five story chapters in navigation');

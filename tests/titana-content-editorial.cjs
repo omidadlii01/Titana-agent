@@ -18,8 +18,8 @@ for(const [label,re]of [['code contracts',/<code\b[^>]*>[\s\S]*?<\/code>/g],['pr
 }
 const asset=/data:[^\s"')<>]+/g;
 assert.deepEqual(blocks(current,asset).sort(),blocks(baseline,asset).filter(x=>!x.startsWith('data:image/png')).sort());checks++;passed.push('All embedded assets preserved');
-const added=new Set(['business-success','campaign-brief','cost-entry-spec','report-scope-note','report-contract','financial-definition','funnel-actions','meeting-decisions'].map(x=>'id="'+x+'"'));
-assert.deepEqual(blocks(current,/\bid="[^"]*"/g).filter(x=>!added.has(x)).sort(),blocks(baseline,/\bid="[^"]*"/g).sort());checks++;passed.push('All IDs retained; eight explanatory regions added');
+const added=new Set(['downloadHtml','business-success','campaign-brief','cost-entry-spec','report-scope-note','report-contract','financial-definition','funnel-actions','meeting-decisions'].map(x=>'id="'+x+'"'));
+assert.deepEqual(blocks(current,/\bid="[^"]*"/g).filter(x=>!added.has(x)).sort(),blocks(baseline,/\bid="[^"]*"/g).sort());checks++;passed.push('All IDs retained; eight explanatory regions and one download link added');
 check(current.includes('<!-- Bundled font and QR third-party license notices (not displayed).'),'License notices retained in non-visible HTML source');
 check(current.includes('SIL OPEN FONT LICENSE Version 1.1')&&current.includes('MIT License — Copyright (c) 2009 Kazuhiko Arase')&&current.includes('Permission is hereby granted, free of charge'),'Full font and QR notices preserved');
 check(!current.includes('مرجع بصری از مخزن تیتانا')&&!current.includes('<footer>'),'Requested reference and footer blocks removed');
