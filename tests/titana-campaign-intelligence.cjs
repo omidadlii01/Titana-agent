@@ -1,0 +1,138 @@
+/* Offline presentation regression test. Development-only dependencies, no runtime CDN.
+   Install: npm install --no-save --no-package-lock playwright@1.64.0 @sparticuz/chromium@153.0.0 jsqr@1.4.0 pngjs@7.0.0 axe-core@4.11.0
+   Run: node tests/titana-campaign-intelligence.cjs
+   Optional: CHROMIUM_EXECUTABLE=/path/to/chromium (uses normal Playwright args).
+   Screenshots, a PDF and machine-readable results are written to ignored .cache/qa-refinement/.
+*/
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+const {chromium:playwright}=require('playwright');
+const jsQR=require('jsqr');
+const {PNG}=require('pngjs');
+const root=path.resolve(__dirname,'..'),out=path.join(root,'.cache/qa-refinement');
+fs.mkdirSync(out,{recursive:true});
+let checks=0;const passed=[];
+function check(condition,label){assert(condition,label);checks++;passed.push(label);}
+(async()=>{
+ let executablePath=process.env.CHROMIUM_EXECUTABLE,args=[];
+ if(!executablePath){const mod=require('@sparticuz/chromium');const chromium=mod.default||mod;executablePath=await chromium.executablePath();args=chromium.args.filter(x=>x!=='--disable-web-security');
+ // The sandbox is Debian rather than Lambda. Inflate the package's NSS/NSPR libraries.
+ const bin=path.resolve(path.dirname(require.resolve('@sparticuz/chromium')),'../bin/al2023.tar.br');
+ if(fs.existsSync(bin)&&mod.inflate){const libs=await mod.inflate(bin);process.env.LD_LIBRARY_PATH=path.join(libs,'lib')+(process.env.LD_LIBRARY_PATH?':'+process.env.LD_LIBRARY_PATH:'');}
+ }
+ const browser=await playwright.launch({headless:true,executablePath,args});
+ try{
+ const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce',acceptDownloads:true});
+ const page=await context.newPage();const errors=[],requests=[],consoleErrors=[];
+ page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});page.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
+ await context.setOffline(true);
+ await page.goto(pathToFileURL(path.join(root,'titana-campaign-intelligence.html')).href);
+ await page.evaluate(()=>document.fonts.ready);
+ check(await page.locator('.section').count()===17,'All 17 original product sections retained');
+ check(await page.locator('[data-nav-act]').count()===5,'Five story chapters in navigation');
+ check(await page.locator('#charts .chart').count()===8,'Eight dashboard charts rendered');
+ check(await page.evaluate(()=>document.documentElement.lang==='fa'&&document.documentElement.dir==='rtl'),'Persian RTL root');
+ check(await page.evaluate(()=>document.fonts.check('14px Vazirmatn')),'Embedded Vazirmatn loaded');
+ const expectedOrder=[1,2,4,5,8,9,11,6,10,3,7,12,13,14,15,16,17];
+ assert.deepEqual(await page.locator('.section').evaluateAll(xs=>xs.map(x=>+x.id.slice(1))),expectedOrder);passed.push('Human-first section ordering');checks++;
+ check(await page.locator('h1').count()===1,'Single document-level heading');
+ check(await page.locator('.delivery-card').count()===8,'Eight concrete deliverables');
+ const ids=await page.locator('[id]').evaluateAll(xs=>xs.map(x=>x.id));check(ids.length===new Set(ids).size,'Unique HTML IDs');
+ const badLinks=await page.locator('a[href^="#"]').evaluateAll(as=>as.map(a=>a.getAttribute('href')).filter(h=>!document.getElementById(decodeURIComponent(h.slice(1)))));check(!badLinks.length,'Every internal anchor resolves');
+ const images=await page.locator('img').evaluateAll(xs=>xs.map(x=>({embedded:x.src.startsWith('data:'),loaded:x.complete&&x.naturalWidth>0})));
+ check(images.length===2&&images.every(x=>x.embedded&&x.loaded),'Both original reference images embedded and decoded');
+ const before=await page.evaluate(()=>TitanaDemo.metrics(TitanaDemo.sessions,TitanaDemo.clicks));
+ assert.deepEqual(before,{sessions:630,users:137,clicks:792,orders:61,revenue:245100000,gross:277000000,refunds:4200000});checks++;passed.push('Original fixture totals unchanged');
+ await page.screenshot({path:path.join(out,'opening-1440.png')});
+ // New educational story must never mutate production-prototype fixture.
+ for(let i=0;i<9;i++){
+  await page.locator('#story-tab-'+i).click();check(await page.locator('#story-pane-'+i).isVisible(),'SMS story step '+(i+1));
+  check(await page.locator('.story-pane:visible').count()===1,'Only selected story pane visible '+i);
+  check(await page.locator('#story-pane-'+i+' .story-facts>div').count()===4,'All four learning questions for story step '+i);
+ }
+ check(await page.locator('#storyNext').isDisabled(),'Story next disabled at final step');
+ await page.locator('#story-tab-8').focus();await page.keyboard.press('Home');check(await page.locator('#story-tab-0').getAttribute('aria-selected')==='true','Story Home keyboard selection');
+ await page.keyboard.press('ArrowDown');check(await page.locator('#story-tab-1').getAttribute('aria-selected')==='true','Story arrow keyboard selection');
+ await page.keyboard.press('End');check(await page.locator('#story-tab-8').getAttribute('aria-selected')==='true','Story End keyboard selection');
+ await page.locator('#storyPrev').click();check(await page.locator('#story-tab-7').getAttribute('aria-selected')==='true','Story previous button');
+ await page.locator('#storyNext').click();check(await page.locator('#story-tab-8').getAttribute('aria-selected')==='true','Story next button');
+ assert.deepEqual(await page.evaluate(()=>TitanaDemo.metrics(TitanaDemo.sessions,TitanaDemo.clicks)),before);checks++;passed.push('Story does not mutate shared dashboard data');
+ assert.deepEqual(await page.evaluate(()=>[...TitanaDemo.smsStory.counts]),[100,45,20,12,8]);checks++;passed.push('Story cohort and 8% conversion isolated from dashboard');
+ await page.locator('#story-tab-4').click();await page.locator('#sms-story').evaluate(e=>e.scrollIntoView({block:'start'}));await page.screenshot({path:path.join(out,'story-1440.png')});
+ // Existing URL logic, including encoding, case-insensitive deduplication and security.
+ await page.locator('#url').fill('https://www.titana.ir/product/123?x=%D8%B3%D9%84%D8%A7%D9%85&x=2&utm_source=old&UTM_SOURCE=OLD#info');
+ const u=new URL(await page.locator('#urlOutput').textContent());assert.deepEqual(u.searchParams.getAll('x'),['سلام','2']);check(u.hash==='#info'&&u.searchParams.getAll('utm_source').length===1&&!u.searchParams.has('UTM_SOURCE'),'Query, Unicode and fragment preserved; duplicate UTM removed');
+ for(const url of ['javascript:alert(1)','http://www.titana.ir','https://www.titana.ir.evil.com','https://user:pass@www.titana.ir','https://www.titana.ir:444/']){await page.locator('#url').fill(url);check(await page.locator('#copyUrl').isDisabled(),'Reject unsafe URL '+url);}
+ await page.locator('#url').fill('https://www.titana.ir/product/123?variant=blue#specs');await page.locator('#utm_source').fill('BAD VALUE');check(await page.locator('#copyUrl').isDisabled(),'Invalid UTM rejected');await page.locator('#utm_source').fill('instagram');
+ await page.locator('#makeQr').click();const png=PNG.sync.read(await page.locator('#qr svg').screenshot());const qr=jsQR(new Uint8ClampedArray(png.data),png.width,png.height);check(qr&&qr.data===await page.locator('#urlOutput').textContent(),'Generated QR decoded to exact current URL');
+ await page.locator('#makeShort').click();check((await page.locator('#shortOutput').textContent()).includes('/r/demo-'),'Short link explicitly simulated');
+ await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:undefined,configurable:true}));await page.locator('#copyUrl').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent==='لینک کپی شد.');passed.push('Clipboard fallback reports successful execCommand');checks++;
+ await page.locator('#utm_id').fill('cmp_qa');await page.locator('#utm_campaign').fill('qa_implant');await page.locator('#owner').fill('=QA');await page.locator('#builderForm button[type=submit]').click();
+ await page.locator('#campaignSearch').fill('cmp_qa');check(await page.locator('#campaignTable tbody tr').count()===1,'Local campaign creation and search');
+ await page.locator('[data-detail="cmp_qa"]').click();await page.locator('#detailStatus').selectOption('archived');await page.locator('#closeDialog').click();check((await page.locator('#campaignTable').textContent()).includes('آرشیوشده'),'Campaign status editing');
+ const [download]=await Promise.all([page.waitForEvent('download'),page.locator('#exportCsv').click()]);await download.saveAs(path.join(out,'campaigns.csv'));const csv=fs.readFileSync(path.join(out,'campaigns.csv'),'utf8');check(csv.includes('cmp_qa')&&csv.includes("'=QA"),'CSV reflects filtered row and neutralizes formula injection');
+ await page.locator('#campaignSearch').fill('');await page.locator('#campaignStatus').selectOption('active');check(!(await page.locator('#campaignTable').textContent()).includes('بازگشت مشتریان'),'Campaign status filter');await page.locator('#campaignStatus').selectOption('');await page.locator('#campaignSort').selectOption('sessions');
+ check((await page.locator('#campaignTable tbody tr').first().textContent()).includes('cmp_1026'),'Campaign numeric sorting');
+ await page.locator('[data-performance="cmp_1024"]').click();check(await page.locator('#f_campaign').inputValue()==='cmp_1024','Campaign performance action sets analytics filter');
+ await page.locator('#resetFilters').click();
+ for(const [key,value] of [['date','early'],['campaign','cmp_1024'],['source','instagram'],['medium','paid_social'],['content','story_a'],['device','mobile'],['landing','/product/123']]){await page.locator('#f_'+key).selectOption(value);check(await page.evaluate(()=>TitanaDemo.filtered().length)>0,'Working dashboard filter '+key);}
+ check(await page.evaluate(()=>TitanaDemo.filtered().length)===43,'Combined filter returns expected 43 sessions');
+ await page.locator('#f_source').selectOption('google');check(await page.evaluate(()=>TitanaDemo.filtered().length)===0,'Contradictory filters show empty dataset');check((await page.locator('#kpiGrid').textContent()).includes('ناموجود'),'Empty dataset has unavailable ratios');await page.locator('#resetFilters').click();
+ const firstText=await page.locator('#attributionTable').textContent();await page.locator('#attributionModel').selectOption('first');check((await page.locator('#attributionTable').textContent())!==firstText,'Attribution switch changes allocation');check(await page.locator('#f_model').inputValue()==='first','Attribution controls synchronized');await page.locator('#f_model').selectOption('last');check((await page.locator('#attributionTable').textContent()).includes('direct'),'Last touch credits direct channel');
+ const totalOK=await page.evaluate(()=>['first','last','last_non_direct'].every(m=>TitanaDemo.orders.reduce((n,o)=>n+(TitanaDemo.touch(o,m)?o.net:0),0)===245100000));check(totalOK,'Revenue conserved across all three attribution models');
+ await page.locator('#resetFilters').click();await page.locator('[data-stage="3"]').click();check((await page.locator('#funnelDetail').textContent()).includes('شروع پرداخت'),'Funnel selection works');
+ const counts=await page.evaluate(()=>[1,2,3,4,5].map(stage=>TitanaDemo.sessions.filter(s=>s.stage>=stage).length));assert.deepEqual(counts,[630,549,300,174,61]);checks++;passed.push('Original ordered funnel cohort conserved');
+ await page.locator('#charts rect[data-label]').first().focus();await page.keyboard.press('Enter');check((await page.locator('#chartSelection').textContent()).includes('سشن'),'Chart selection with keyboard');
+ const legacy=page.locator('#s6 > details').filter({hasText:'مثال تکمیلی'});await legacy.locator('summary').first().click();await page.locator('[data-step="8"]').click();check((await page.locator('#journeyDetail').textContent()).includes('outbox'),'Original Instagram customer journey preserved');
+ await page.locator('#replayEvents').click();await page.waitForTimeout(2000);check(await page.locator('#eventMonitor div').count()===5,'Event monitor replay');
+ await page.locator('#s7 > details').filter({hasText:'فهرست کامل رویدادها'}).locator('summary').click();check(await page.locator('#s7 table tbody tr').count()===9,'All nine technical event contracts preserved');
+ await page.locator('#s13 > details').filter({hasText:'ساختار دقیق جدول‌ها'}).locator('summary').click();check(await page.locator('#s13 table tbody tr').count()===9,'All nine database entities preserved');
+ await page.locator('#s14 .api-list details').first().locator('summary').click();check(await page.locator('#s14 .api-list details[open]').count()===1,'API details expand');
+ await page.locator('[data-check="0"]').check();await page.reload();check(await page.locator('[data-check="0"]').isChecked(),'Checklist persists across reload');await page.locator('#resetChecks').click();
+ await page.evaluate(()=>localStorage.setItem('titana-acceptance-v1','{}'));await page.reload();check(!await page.locator('[data-check="0"]').isChecked(),'Malformed checklist storage handled safely');
+ // Meeting-mode layout and keyboard escape.
+ await page.locator('#s1').evaluate(e=>e.scrollIntoView({block:'start'}));await page.locator('#presentationToggle').click();check(await page.locator('body').evaluate(e=>e.classList.contains('presenting')),'Presentation mode enabled');await page.locator('#presentNext').click();await page.waitForTimeout(100);check((await page.locator('#presentStatus').textContent()).includes('۲'),'Presentation next follows narrative order');await page.locator('#presentPrev').click();await page.keyboard.press('Escape');check(!await page.locator('body').evaluate(e=>e.classList.contains('presenting')),'Escape exits meeting mode');
+ const layouts=[];
+ for(const width of [1440,1024,768,390,360]){
+  await page.setViewportSize({width,height:1000});await page.evaluate(()=>scrollTo(0,0));await page.waitForTimeout(120);
+  check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No document overflow at '+width);
+  await page.screenshot({path:path.join(out,'opening-'+width+'.png')});
+  const beforeHidden=await page.locator('#rail').evaluate(el=>el.inert);
+  if(width<=900){check(beforeHidden,'Closed mobile navigation inert at '+width);await page.locator('#menuToggle').click();check(await page.locator('#menuToggle').getAttribute('aria-expanded')==='true','Mobile nav opens at '+width);check(await page.locator('#closeMobileNav').evaluate(el=>document.activeElement===el),'Mobile nav receives focus at '+width);await page.keyboard.press('Shift+Tab');check(await page.locator('#rail').evaluate(el=>el.contains(document.activeElement)),'Mobile nav traps focus at '+width);await page.locator('[data-act-link="3"]').click();await page.waitForTimeout(120);check(await page.locator('[data-nav="6"]').getAttribute('aria-current')==='location','Active section after chapter link at '+width);check(await page.locator('#menuToggle').getAttribute('aria-expanded')==='false','Navigation closes on selection at '+width);await page.locator('#menuToggle').click();await page.keyboard.press('Escape');check(await page.locator('#menuToggle').evaluate(el=>document.activeElement===el),'Escape restores menu focus at '+width);}
+  else{check(!beforeHidden,'Desktop navigation interactive at '+width);}
+  await page.locator('#story-tab-4').click();
+  for(const [id,name] of [['sms-story','story'],['s8','dashboard'],['s3','architecture'],['s17','deliverables']]){await page.locator('#'+id).evaluate(e=>e.scrollIntoView({block:'start'}));await page.waitForTimeout(50);await page.screenshot({path:path.join(out,name+'-'+width+'.png')});}
+  layouts.push({width,documentWidth:await page.evaluate(()=>document.documentElement.scrollWidth)});
+ }
+ await page.setViewportSize({width:1440,height:1000});
+ await page.locator('#story-tab-4').click();
+ // Print includes every story step and every detail, then restores reading state.
+ const openedBefore=await page.locator('details[open]').count();
+ await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));check(await page.locator('details[open]').count()===await page.locator('details').count(),'Print expands all technical panels');await page.emulateMedia({media:'print'});
+ check(await page.locator('.story-pane:visible').count()===9,'Print includes all nine SMS story panes');
+ check(await page.locator('.rail').isHidden()&&await page.locator('.topbar').isHidden(),'Print hides navigation');
+ await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+ check(await page.locator('details[open]').count()===openedBefore,'Synthetic print cycle restores original details state');
+ await page.pdf({path:path.join(out,'presentation.pdf'),format:'A4',printBackground:true});
+ check(await page.locator('details[open]').count()===openedBefore,'Native PDF print cycle restores original details state');
+ await page.emulateMedia({media:'screen'});
+ check(await page.locator('.story-pane:visible').count()===1,'Screen returns to a single story pane after print');
+ // Automated accessibility checks supplement (not replace) keyboard and visual review.
+ await page.addScriptTag({path:require.resolve('axe-core')});
+ const axeOptions={runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}};
+ const axeResults=[];
+ for(const state of ['desktop','expanded','mobile']){
+  if(state==='expanded')await page.evaluate(()=>document.querySelectorAll('details').forEach(d=>d.open=true));
+  if(state==='mobile'){await page.setViewportSize({width:390,height:1000});await page.locator('#story-tab-4').click();}
+  const findings=await page.evaluate(async options=>{const r=await axe.run(document,options);return {violations:r.violations,incomplete:r.incomplete.map(x=>({id:x.id,nodes:x.nodes.length}))};},axeOptions);
+  axeResults.push({state,...findings});check(!findings.incomplete.some(x=>x.id==='aria-prohibited-attr'),'Labeled regions have explicit accessible roles in '+state);check(findings.violations.length===0,'No axe A/AA violations in '+state+' state');
+ }
+ fs.writeFileSync(path.join(out,'accessibility.json'),JSON.stringify(axeResults,null,2));
+ check(errors.length===0,'Zero JavaScript exceptions');check(consoleErrors.length===0,'Zero console errors');check(requests.length===0,'Zero external HTTP/HTTPS requests while offline');
+ const result={status:'PASS',checks,passed,totals:before,story:{counts:[100,45,20,12,8],conversion:0.08,isolated:true},layouts,errors,consoleErrors,requests,browser:browser.version(),dependencies:Object.fromEntries(['playwright','@sparticuz/chromium','jsqr','pngjs','axe-core'].map(n=>[n,JSON.parse(fs.readFileSync(path.join(root,'node_modules',n,'package.json'),'utf8')).version]))};
+ fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+ }finally{await browser.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});
