@@ -49,7 +49,7 @@
 </aside>
 <main>
 <section aria-labelledby="section-title-1" class="section" data-act="1" data-reading-order="1" id="s1" tabindex="-1">
-<div class="act-band" id="act1"><span>مرحلهٔ ۱ از ۵</span><strong>مسئله ما چیست؟</strong><p>اول بدانیم چرا این محصول لازم است.</p></div><div class="eyebrow">بخش ۰۱ · مسئله ما چیست؟</div><h1 id="section-title-1">سیستم اختصاصی مدیریت و تحلیل کمپین‌های تیتانا</h1><p class="intro">ما می‌خواهیم تیم بازاریابی در پنل تیتانا لینک کمپین بسازد و نتیجهٔ آن را ببیند: چند نفر وارد سایت شده‌اند، چه مراحلی را طی کرده‌اند و کدام سفارش‌ها تأیید شده‌اند. در این ارائه می‌گوییم چه چیزی لازم داریم، از کجا شروع کنیم و هر بخش را چطور بررسی کنیم.</p><div class="download-delivery"><a class="button" id="downloadHtml" href="titana-campaign-intelligence.html" download="titana-campaign-intelligence.html">دانلود نسخهٔ آفلاین HTML</a><p class="small">فایل را دانلود کنید و با مرورگر باز کنید؛ برای دیدن ارائه و کار با نمونه به اینترنت نیاز ندارید. این دانلود، نسخهٔ اصلی ارائه است؛ لینک‌هایی که در نمونه ساخته‌اید و فیلترهای فعلی داخل آن ذخیره نمی‌شوند. لینک‌های کوتاه همچنان نمایشی‌اند.</p></div>
+<div class="act-band" id="act1"><span>مرحلهٔ ۱ از ۵</span><strong>مسئله ما چیست؟</strong><p>اول بدانیم چرا این محصول لازم است.</p></div><div class="eyebrow">بخش ۰۱ · مسئله ما چیست؟</div><h1 id="section-title-1">سیستم اختصاصی مدیریت و تحلیل کمپین‌های تیتانا</h1><p class="intro">ما می‌خواهیم تیم بازاریابی در پنل تیتانا لینک کمپین بسازد و نتیجهٔ آن را ببیند: چند نفر وارد سایت شده‌اند، چه مراحلی را طی کرده‌اند و کدام سفارش‌ها تأیید شده‌اند. در این ارائه می‌گوییم چه چیزی لازم داریم، از کجا شروع کنیم و هر بخش را چطور بررسی کنیم.</p><div class="download-delivery"><a class="button" id="downloadHtml" href="titana-campaign-intelligence.html?download=1" target="_blank" rel="noopener">دریافت نسخهٔ آفلاین HTML</a><p class="small">در Preview، صفحهٔ دانلود در یک زبانهٔ تازه باز می‌شود؛ آنجا «دانلود فایل HTML» را بزنید. اگر زبانه باز نشد، ابتدا خود Preview را با گزینهٔ Open in new tab در مرورگر باز کنید. فایل دریافتی بدون اینترنت کار می‌کند. این دانلود، نسخهٔ اصلی ارائه است؛ لینک‌هایی که در نمونه ساخته‌اید و فیلترهای فعلی داخل آن ذخیره نمی‌شوند. لینک‌های کوتاه همچنان نمایشی‌اند.</p></div>
 <div class="presentation-overview" id="presentation-overview" role="region" aria-labelledby="overview-title">
 <h2 id="overview-title">این ارائه دربارهٔ چیست؟</h2>
 <p>از یک ابزار ساده شروع می‌کنیم: ساخت لینک کوتاه و گزارش بازشدن آن. بعد، ثبت رفتار داخل سایت و اتصال سفارش را اضافه می‌کنیم. قرار نیست همهٔ امکانات از روز اول آماده باشند.</p>
@@ -2856,4 +2856,14 @@ $$('[data-flow]').forEach(b=>b.onclick=()=>selectRedirectStep(+b.dataset.flow));
 buildUrl();refreshFilterOptions();renderCampaigns();renderShortRegistry();selectRedirectStep(0);selectJourney(0);renderMonitor();renderAnalytics();renderHero();updateChecks();selectStory(0);setNav(false);makeScrollableTables();updateNav();
 // Read-only diagnostics for repeatable QA; no network or tracking.
 window.TitanaDemo={sessions,clicks,orders,metrics,filtered,touch,buildUrl,smsStory,shortRecords,redirectRequests,shortReportData,simulateResolve,randomRoute,aliasError,version:1.2};
-</script></body></html>
+</script><script id="offline-download-link">
+// Local copies do not need the preview server's download page.
+if (location.protocol === 'file:') {
+  const link = document.getElementById('downloadHtml');
+  link.href = 'titana-campaign-intelligence.html';
+  link.setAttribute('download', 'titana-campaign-intelligence.html');
+  link.removeAttribute('target');
+  link.textContent = 'دانلود نسخهٔ آفلاین HTML';
+}
+</script>
+</body></html>

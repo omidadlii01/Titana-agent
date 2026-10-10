@@ -9,7 +9,7 @@ const scripts=s=>[...s.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[
 const oldScripts=scripts(baseline),newScripts=scripts(current);let checks=0;const passed=[];
 function check(value,label){assert(value,label);checks++;passed.push(label);}
 function normalize(node){if(Array.isArray(node))return node.map(normalize);if(!node||typeof node!=='object')return node;const out={};for(const [key,value] of Object.entries(node)){if(['start','end','raw'].includes(key))continue;out[key]=node.type==='Literal'&&key==='value'&&typeof value==='string'&&/[\u0600-\u06ff]/.test(value)?'<PERSIAN UI COPY>':normalize(value);}return out;}
-check(oldScripts.length===newScripts.length,'Script count preserved');
+check(oldScripts.length+1===newScripts.length,'Original scripts plus isolated offline-download adapter');
 // This revision changes Persian copy only in JavaScript; every executable node is preserved.
 oldScripts.forEach((src,i)=>{assert.deepEqual(normalize(acorn.parse(src,{ecmaVersion:'latest'})),normalize(acorn.parse(newScripts[i],{ecmaVersion:'latest'})));checks++;passed.push('Executable AST preserved except Persian UI copy: script '+i);});
 function blocks(s,re){return [...s.matchAll(re)].map(m=>m[0]);}
@@ -18,7 +18,7 @@ for(const [label,re]of [['code contracts',/<code\b[^>]*>[\s\S]*?<\/code>/g],['pr
 }
 const asset=/data:[^\s"')<>]+/g;
 assert.deepEqual(blocks(current,asset).sort(),blocks(baseline,asset).filter(x=>!x.startsWith('data:image/png')).sort());checks++;passed.push('All embedded assets preserved');
-const added=new Set(['downloadHtml','business-success','campaign-brief','cost-entry-spec','report-scope-note','report-contract','financial-definition','funnel-actions','meeting-decisions'].map(x=>'id="'+x+'"'));
+const added=new Set(['offline-download-link','downloadHtml','business-success','campaign-brief','cost-entry-spec','report-scope-note','report-contract','financial-definition','funnel-actions','meeting-decisions'].map(x=>'id="'+x+'"'));
 assert.deepEqual(blocks(current,/\bid="[^"]*"/g).filter(x=>!added.has(x)).sort(),blocks(baseline,/\bid="[^"]*"/g).sort());checks++;passed.push('All IDs retained; eight explanatory regions and one download link added');
 check(current.includes('<!-- Bundled font and QR third-party license notices (not displayed).'),'License notices retained in non-visible HTML source');
 check(current.includes('SIL OPEN FONT LICENSE Version 1.1')&&current.includes('MIT License — Copyright (c) 2009 Kazuhiko Arase')&&current.includes('Permission is hereby granted, free of charge'),'Full font and QR notices preserved');
